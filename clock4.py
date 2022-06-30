@@ -50,7 +50,8 @@ class Weather:
         self.weather_str = 'No Weather Data'
         self.weather_api_key = config.weather_api_key
         self.weather_city = config.weather_city       
-        
+        self.degrees = u"\N{Degree Sign}"
+
     def get_weather(self, q):
         try:
             # get weather observations
@@ -65,15 +66,15 @@ class Weather:
             wind_dir = self.get_wind_direction(weather['wind']['deg'])
             wind_speed = int(weather['wind']['speed'])
             description = weather['weather'][0]['description']
-            self.weather_str = '* Weather *  {}: {}f / {}c  {}% hum  {}@{}mph {}'.format(city,
-                                temp_f, temp_c, humidity, wind_dir, wind_speed, description)
+            # self.weather_str = '* Weather *  {} - {}{}f / {}{}c : {}% rel hum : winds {}@{}mph : {}'.format(city,
+            #                     temp_f, self.degrees, temp_c, self.degrees, humidity, wind_dir, wind_speed, description)
 
             # get forcast
             # print(self.FORECAST_URL.format(self.weather_city, self.weather_api_key))
             forecast = requests.get(self.FORECAST_URL.format(self.weather_city, self.weather_api_key), verify=False).json()
             short_forecast = forecast['list'][2]['weather'][0]['description']
-            self.weather_str += ' 3hr forecast: {}'.format(short_forecast)
-            
+            # self.weather_str += ' : 3hr forecast: {}'.format(short_forecast)
+                      
             # get weather alerts
             # print(self.ALERT_URL.format(coord[0], coord[1]))
             alerts = requests.get(self.ALERT_URL.format(coord[0], coord[1]), verify=False).json()
@@ -93,19 +94,25 @@ class Weather:
                 if start_time is not None and end_time is not None:
                     now_time = datetime.datetime.now(tzlocal())
                     if start_time < now_time < end_time:
-                        alert_str = '! {} !'.format(alerts['features'][0]['properties']['event'])
+                        alert_str = '! {} ! '.format(alerts['features'][0]['properties']['event'])
                 
                 # sometimes there is no end date
                 elif start_time is not None:
                     now_time = datetime.datetime.now(tzlocal())
                     if start_time < now_time:
-                        alert_str = '! {} !'.format(alerts['features'][0]['properties']['event'])
+                        alert_str = '! {} ! '.format(alerts['features'][0]['properties']['event'])
                 
-            # build weather string with alert
-            if len(alert_str) > 1:
-                self.weather_str = '* Weather *  {}: {}  {}f / {}c  {}% hum  {}@{}mph  {}  3hr forecast: {}'.format(city,
-                                    alert_str, temp_f, temp_c, humidity, wind_dir, wind_speed, description, short_forecast)
-         
+            # build weather string with or without alert
+            self.weather_str = '* Weather *  {} - {}{}{}f / {}{}c : {}% rel hum : winds {}@{}mph : {} : 3hr forecast: {}'.format(city,
+                                    alert_str, temp_f, self.degrees, temp_c, self.degrees, humidity, wind_dir, wind_speed, description, short_forecast)
+
+            # if len(alert_str) > 1:
+            #     self.weather_str = '* Weather *  {} - {} {}{}f / {}{}c : {}% rel hum : winds {}@{}mph : {} : 3hr forecast: {}'.format(city,
+            #                         alert_str, temp_f, self.degrees, temp_c, self.degrees, humidity, wind_dir, wind_speed, description, short_forecast)
+            # else:
+            #     self.weather_str = '* Weather *  {} - {}{}f / {}{}c : {}% rel hum : winds {}@{}mph : {} : 3hr forecast: {}'.format(city,
+            #                         temp_f, self.degrees, temp_c, self.degrees, humidity, wind_dir, wind_speed, description, short_forecast)
+
             #print('\nweather updated @ {}'.format(datetime.datetime.now()))
             print(self.weather_str)
             
@@ -284,9 +291,9 @@ class Clock(SampleBase):
         textColor = graphics.Color(255, 235, 59)
 
         # set initial values
-        weather_string = 'No weather data.'
-        market_string = 'No market data.'
-        headlines_string = 'No headlines data.'
+        weather_string = 'No weather data yet.'
+        market_string = 'No market data yet.'
+        headlines_string = 'No headlines data yet.'
         
         big_x = 64
         last_switch = datetime.datetime.now()
@@ -368,6 +375,7 @@ class Clock(SampleBase):
                     update_markets()
                     update_headlines()
                     init = False
+                    
         except KeyboardInterrupt:
             print("Exiting\n")
             tl.stop()

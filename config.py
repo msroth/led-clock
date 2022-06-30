@@ -7,7 +7,7 @@ weather_api_key = '2ec33ce45f88dfcf30961aaf6bc2a0b7'
 # number of minutes between weather updates
 weather_update_rate = 5
 # stock market symbols
-symbols=['AAPL', 'AMZN', 'GOOGL', 'MSFT', 'TSLA']
+symbols=['AAPL', 'AMZN', 'GOOGL', 'MSFT', 'TSLA', 'HD', 'PEP']
 # number of minutes between market updates
 market_update_rate = 5
 # number of seconds between time format changes

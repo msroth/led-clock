@@ -1,5 +1,5 @@
 """
-(C) MS Roth 2021
+(C) MS Roth 2020-2022
 Simple LED Clock with weather forecast and stock market update.
 
 """
@@ -62,18 +62,16 @@ class Weather:
             coord = (weather['coord']['lat'], weather['coord']['lon'])
             temp_f = int(weather['main']['temp'])
             temp_c = int((temp_f - 32) / 1.8)
+            feels_like = int(weather['main']['feels_like']/1.0)
             humidity = weather['main']['humidity']
             wind_dir = self.get_wind_direction(weather['wind']['deg'])
             wind_speed = int(weather['wind']['speed'])
             description = weather['weather'][0]['description']
-            # self.weather_str = '* Weather *  {} - {}{}f / {}{}c : {}% rel hum : winds {}@{}mph : {}'.format(city,
-            #                     temp_f, self.degrees, temp_c, self.degrees, humidity, wind_dir, wind_speed, description)
 
             # get forcast
             # print(self.FORECAST_URL.format(self.weather_city, self.weather_api_key))
             forecast = requests.get(self.FORECAST_URL.format(self.weather_city, self.weather_api_key), verify=False).json()
             short_forecast = forecast['list'][2]['weather'][0]['description']
-            # self.weather_str += ' : 3hr forecast: {}'.format(short_forecast)
                       
             # get weather alerts
             # print(self.ALERT_URL.format(coord[0], coord[1]))
@@ -93,25 +91,18 @@ class Weather:
                 # determine if statement is active
                 if start_time is not None and end_time is not None:
                     now_time = datetime.datetime.now(tzlocal())
-                    if start_time < now_time < end_time:
+                    if start_time <= now_time < end_time:
                         alert_str = '! {} ! '.format(alerts['features'][0]['properties']['event'])
                 
                 # sometimes there is no end date
                 elif start_time is not None:
                     now_time = datetime.datetime.now(tzlocal())
-                    if start_time < now_time:
+                    if start_time <= now_time:
                         alert_str = '! {} ! '.format(alerts['features'][0]['properties']['event'])
                 
             # build weather string with or without alert
-            self.weather_str = '* Weather *  {} - {}{}{}f / {}{}c : {}% rel hum : winds {}@{}mph : {} : 3hr forecast: {}'.format(city,
-                                    alert_str, temp_f, self.degrees, temp_c, self.degrees, humidity, wind_dir, wind_speed, description, short_forecast)
-
-            # if len(alert_str) > 1:
-            #     self.weather_str = '* Weather *  {} - {} {}{}f / {}{}c : {}% rel hum : winds {}@{}mph : {} : 3hr forecast: {}'.format(city,
-            #                         alert_str, temp_f, self.degrees, temp_c, self.degrees, humidity, wind_dir, wind_speed, description, short_forecast)
-            # else:
-            #     self.weather_str = '* Weather *  {} - {}{}f / {}{}c : {}% rel hum : winds {}@{}mph : {} : 3hr forecast: {}'.format(city,
-            #                         temp_f, self.degrees, temp_c, self.degrees, humidity, wind_dir, wind_speed, description, short_forecast)
+            self.weather_str = '* Weather *  {} : {}{}{}f / {}{}c (~ {}{}f), {}% rel hum,  winds {}@{}mph, {}, 3hr forecast: {}'.format(city,
+                                    alert_str, temp_f, self.degrees, temp_c, self.degrees, feels_like, self.degrees, humidity, wind_dir, wind_speed, description, short_forecast)
 
             #print('\nweather updated @ {}'.format(datetime.datetime.now()))
             print(self.weather_str)
@@ -125,7 +116,7 @@ class Weather:
         
     def get_wind_direction(self, deg):
         """
-        Return the cardinal directions for the wind
+        Return the compass directions for the wind
         """
         
         if 0 <= int(deg) <= 23 or 338 < int(deg) <= 360:
@@ -170,7 +161,6 @@ class Market:
             
             if self.is_business_day() and self.is_business_hours():
                 self.market_str = '* Market update *'
-                #for i in range(len(tickers.tickers)):
                 for i in tickers.tickers:
                     trend = ''
                     avg_bid_ask = (float(tickers.tickers[i].info['bid']) + float(tickers.tickers[i].info['ask']))/2 
@@ -183,7 +173,6 @@ class Market:
                                                       avg_bid_ask, trend)
             else:
                 self.market_str = '* Markets are closed *'
-                #for i in range(len(tickers.tickers)):
                 for i in tickers.tickers:
                     trend = ''
                     dif = float(tickers.tickers[i].history()['Close'][-1]) - float(tickers.tickers[i].info['previousClose']) 
@@ -252,8 +241,7 @@ class Headlines:
             if int(top_headlines['totalResults']) >= 5:
                 for i in range(5):
                     headline = top_headlines['articles'][i]['title']
-                    # self.headline_str += '{};  '.format(headline.encode('ascii', 'ignore'))
-                    self.headline_str += '{};  '.format(headline)
+                    self.headline_str += '{}.  '.format(headline)
 
             #print('\nheadlines updated @ {}'.format(datetime.datetime.now()))
             print(self.headline_str)
@@ -404,7 +392,7 @@ def update_headlines():
 
 
 if __name__ == '__main__':
-    print('(C) 2020-2021 MSRoth')
+    print('(C) 2020-2022 MSRoth')
     print('LED clock on 64x32 LED matrix with weather, market, and news updates.')
     print('See config.py for details. Press CTRL-C to stop clock.')
     print('Loading data...\n\n')

@@ -1,5 +1,5 @@
 """
-(C) MS Roth 2020-2022
+(C) MS Roth 2020-2023
 Simple LED Clock with weather forecast and stock market update.
 
 """
@@ -11,15 +11,17 @@ import config
 import sys
 import argparse
 import os
-import yfinance as yf
+#import yfinance as yf
 import multiprocessing as mp
 import holidays
 import requests
 import urllib3
+import urllib 
 import dateutil.parser
 from dateutil.tz import tzlocal
 from timeloop import Timeloop
 from samplebase import SampleBase
+
 
 # disable HTTPS warnings
 urllib3.disable_warnings()
@@ -51,13 +53,13 @@ class Weather:
         self.weather_api_key = config.weather_api_key
         self.weather_city = config.weather_city       
         self.degrees = u"\N{Degree Sign}"
+        self.headers = {'User-Agent': 'LED-Clock'}
 
     def get_weather(self, q):
         try:
             # get weather observations
-            #print(self.WEATHER_URL.format(self.weather_city, self.weather_api_key))
             onset_time = None
-            weather = requests.get(self.WEATHER_URL.format(self.weather_city, self.weather_api_key), verify=False).json()
+            weather = requests.get(self.WEATHER_URL.format(self.weather_city, self.weather_api_key), headers=self.headers, verify=False).json()
             city = weather['name']
             coord = (weather['coord']['lat'], weather['coord']['lon'])
             temp_f = int(weather['main']['temp'])
@@ -69,16 +71,14 @@ class Weather:
             description = weather['weather'][0]['description']
 
             # get forcast
-            # print(self.FORECAST_URL.format(self.weather_city, self.weather_api_key))
-            forecast = requests.get(self.FORECAST_URL.format(self.weather_city, self.weather_api_key), verify=False).json()
+            forecast = requests.get(self.FORECAST_URL.format(self.weather_city, self.weather_api_key), headers=self.headers, verify=False).json()
             short_forecast = forecast['list'][2]['weather'][0]['description']
                       
             # get weather alerts
-            # print(self.ALERT_URL.format(coord[0], coord[1]))
-            alerts = requests.get(self.ALERT_URL.format(coord[0], coord[1]), verify=False).json()
+            alerts = requests.get(self.ALERT_URL.format(coord[0], coord[1]), headers=self.headers, verify=False).json()
             alert_str = ''
             if len(alerts['features']) > 0:
-                #onset_time = alerts['features'][0]['properties']['onset']
+                onset_time = alerts['features'][0]['properties']['effective']
                 ends_time = alerts['features'][0]['properties']['ends']
                 start_time = None
                 end_time = None
@@ -101,7 +101,7 @@ class Weather:
                         alert_str = '! {} ! '.format(alerts['features'][0]['properties']['event'])
                 
             # build weather string with or without alert
-            self.weather_str = '* Weather *  {} : {}{}{}f / {}{}c (~ {}{}f), {}% rel hum,  winds {}@{}mph, {}, 3hr forecast: {}'.format(city,
+            self.weather_str = '* Weather *  {} : {}{}{}f / {}{}c (feels like {}{}f). {}% rel hum.  winds {}@{}mph. {}. 3hr forecast: {}.'.format(city,
                                     alert_str, temp_f, self.degrees, temp_c, self.degrees, feels_like, self.degrees, humidity, wind_dir, wind_speed, description, short_forecast)
 
             #print('\nweather updated @ {}'.format(datetime.datetime.now()))
@@ -139,52 +139,44 @@ class Weather:
         
 class Market:
     """
-    Return stock market data for the indexes in addition to other symbols read from
-    the config.py file.
+    Return stock market data from Yahoo Financial for the indexes in addition to other 
+    symbols read from the config.py file.
 
-    While the market is open, the ticker displays the current ask price and the delta from its
-    opening price.
+    The ticker displays the current or last price and the delta from its opening price.
 
-    While the market is closed, it displays the last close price.
     """
 
     symbols = ['^DJI', '^SPX']  # DJIA, S&P500
     market_str = ''
+    MARKET_URL = 'http://query2.finance.yahoo.com/v8/finance/chart/{}'
     
     def __init__(self):
         self.market_str = 'No Market Data'
         self.symbols.extend(config.symbols)
+        self.headers = {'User-Agent': 'LED-Clock'}
         
     def get_markets(self, q):
         try:
-            tickers = yf.Tickers(self.symbols)
             
             if self.is_business_day() and self.is_business_hours():
                 self.market_str = '* Market update *'
-                for i in tickers.tickers:
-                    trend = ''
-                    avg_bid_ask = (float(tickers.tickers[i].info['bid']) + float(tickers.tickers[i].info['ask']))/2 
-                    dif = avg_bid_ask - float(tickers.tickers[i].info['open'])
-                    if dif <= 0:
-                        trend = '{:.2f}'.format(dif)
-                    else:
-                        trend = '+{:.2f}'.format(dif)
-                    self.market_str += '  {}: {:.2f}/{}'.format(tickers.tickers[i].info['symbol'],
-                                                      avg_bid_ask, trend)
             else:
                 self.market_str = '* Markets are closed *'
-                for i in tickers.tickers:
-                    trend = ''
-                    dif = float(tickers.tickers[i].history()['Close'][-1]) - float(tickers.tickers[i].info['previousClose']) 
-                    if dif <= 0:
-                        trend = '{:.2f}'.format(dif)
-                    else:
-                        trend = '+{:.2f}'.format(dif)
-                    self.market_str += '  {}: {:.2f}/{}'.format(tickers.tickers[i].info['symbol'],
-                                                      tickers.tickers[i].history()['Close'][-1],
-                                                      trend)
-                          
-            #print('\nmarket updated @ {}'.format(datetime.datetime.now()))
+                            
+            for symbol in self.symbols:   
+                trend = ''
+                url = self.MARKET_URL.format(urllib.parse.quote_plus(symbol))
+                chart = requests.get(url, headers=self.headers, verify=False).json()
+                
+                close_price = float(chart['chart']['result'][0]['meta']['chartPreviousClose'])
+                current_price = float(chart['chart']['result'][0]['meta']['regularMarketPrice'])
+                dif = current_price - close_price
+
+                if dif <= 0:
+                    trend = '{:.2f}'.format(dif)
+                else:
+                    trend = '+{:.2f}'.format(dif)
+                self.market_str += '  {}: {:.2f}/{}'.format(symbol, current_price, trend)
             print(self.market_str)
             
             # put the market string into the queue to be read later
@@ -221,7 +213,7 @@ class Market:
 
 class Headlines:
     """
-    Get top headlines
+    Get top headlines (5) from source defined in config file
     """
 
     headline_str = ''
@@ -229,11 +221,12 @@ class Headlines:
         
     def __init__(self):
         self.headline_str = 'No Headlines Data'
+        self.headers = {'User-Agent': 'LED-Clock'}
         
     def get_headlines(self, q):
         
         try:
-            response = requests.get(self.NEWS_URL, verify=False)
+            response = requests.get(self.NEWS_URL, headers=self.headers, verify=False)
             top_headlines = response.json()
 
             self.headline_str = '* Headlines *  '
@@ -243,7 +236,6 @@ class Headlines:
                     headline = top_headlines['articles'][i]['title']
                     self.headline_str += '{}.  '.format(headline)
 
-            #print('\nheadlines updated @ {}'.format(datetime.datetime.now()))
             print(self.headline_str)
             
             # put the headlines string into the queue to be read later
@@ -284,7 +276,7 @@ class Clock(SampleBase):
         headlines_string = 'No headlines data yet.'
         
         big_x = 64
-        last_switch = datetime.datetime.now()
+        last_switch = datetime.datetime.now().astimezone()
         show_dow = False
         init = True
         
@@ -295,7 +287,7 @@ class Clock(SampleBase):
             while True:
                 
                 # get the current time
-                now = datetime.datetime.now()
+                now = datetime.datetime.now().astimezone()
 
                 # references for time formats
                 # https://www.programiz.com/python-programming/datetime/strftime
@@ -314,7 +306,7 @@ class Clock(SampleBase):
                     
                 # switch dow and date every X sec
                 if (now - last_switch).seconds > config.face_flip_rate:
-                    last_switch = datetime.datetime.now()
+                    last_switch = datetime.datetime.now().astimezone()
                     if show_dow == False:
                         show_dow = True
                     else:
@@ -330,7 +322,7 @@ class Clock(SampleBase):
                     time_string = now.strftime('%H:%M:%S')
                     
                 # concat the msg strings
-                msg_string = weather_string + ' '*12 + market_string + ' '*12 + headlines_string
+                msg_string = weather_string + ' '*10 + market_string + ' '*10 + headlines_string
                 
                 # fill convas with black
                 canvas.Fill(0, 0, 0)
@@ -372,31 +364,31 @@ class Clock(SampleBase):
 
 @tl.job(interval=datetime.timedelta(minutes=config.weather_update_rate))        
 def update_weather():
-    print('\nweather updated @ {}'.format(datetime.datetime.now()))
+    print('\nweather updated @ {}'.format(datetime.datetime.now().astimezone()))
     w = Weather()
     w.get_weather(qw)
 
 
 @tl.job(interval=datetime.timedelta(minutes=config.market_update_rate))        
 def update_markets():
-    print('\nmarkets updated @ {}'.format(datetime.datetime.now()))
+    print('\nmarkets updated @ {}'.format(datetime.datetime.now().astimezone()))
     m = Market()
     m.get_markets(qm)
 
 
 @tl.job(interval=datetime.timedelta(minutes=config.news_update_rate))        
 def update_headlines():
-    print('\nheadlines updated @ {}'.format(datetime.datetime.now()))
+    print('\nheadlines updated @ {}'.format(datetime.datetime.now().astimezone()))
     h = Headlines()
     h.get_headlines(qh)    
 
 
 if __name__ == '__main__':
-    print('(C) 2020-2022 MSRoth')
+    print('(C) 2020-2023 MSRoth')
     print('LED clock on 64x32 LED matrix with weather, market, and news updates.')
     print('See config.py for details. Press CTRL-C to stop clock.')
     print('Loading data...\n\n')
-
+    
     clock = Clock()
     if (not clock.process()):
         clock.print_help()

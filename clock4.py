@@ -146,15 +146,16 @@ class Market:
 
     """
 
-    symbols = ['^DJI', '^SPX']  # DJIA, S&P500
+    symbols = []
     market_str = ''
     MARKET_URL = 'http://query2.finance.yahoo.com/v8/finance/chart/{}'
     
     def __init__(self):
         self.market_str = 'No Market Data'
+        self.symbols = ['^DJI', '^SPX']  # DJIA, S&P500
         self.symbols.extend(config.symbols)
         self.headers = {'User-Agent': 'LED-Clock'}
-        
+            
     def get_markets(self, q):
         try:
             
@@ -216,7 +217,6 @@ class Headlines:
     Get top headlines (5) from source defined in config file
     """
 
-    headline_str = ''
     NEWS_URL = 'http://newsapi.org/v2/top-headlines?sources={}&apiKey={}'.format(config.news_source, config.news_api_key)
         
     def __init__(self):
@@ -322,7 +322,7 @@ class Clock(SampleBase):
                     time_string = now.strftime('%H:%M:%S')
                     
                 # concat the msg strings
-                msg_string = weather_string + ' '*10 + market_string + ' '*10 + headlines_string
+                msg_string = weather_string + ' '*8 + market_string + ' '*8 + headlines_string
                 
                 # fill convas with black
                 canvas.Fill(0, 0, 0)

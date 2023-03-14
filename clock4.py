@@ -78,8 +78,8 @@ class Weather:
             alerts = requests.get(self.ALERT_URL.format(coord[0], coord[1]), headers=self.headers, verify=False).json()
             alert_str = ''
             if len(alerts['features']) > 0:
-                onset_time = alerts['features'][0]['properties']['effective']
-                ends_time = alerts['features'][0]['properties']['ends']
+                onset_time = alerts['features'][len(alerts['features'])-1]['properties']['effective']  # take latest alert
+                ends_time = alerts['features'][len(alerts['features'])-1]['properties']['ends']        # take latest alert 
                 start_time = None
                 end_time = None
                 
@@ -92,7 +92,7 @@ class Weather:
                 if start_time is not None and end_time is not None:
                     now_time = datetime.datetime.now(tzlocal())
                     if start_time <= now_time < end_time:
-                        alert_str = '! {} ! '.format(alerts['features'][0]['properties']['event'])
+                        alert_str = '! {} ! '.format(alerts['features'][len(alerts['features'])-1]['properties']['event'])  # take latest alert
                 
                 # sometimes there is no end date
                 elif start_time is not None:
